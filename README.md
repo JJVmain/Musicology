@@ -4,4 +4,4 @@ Motown was a widely cherished label that has produced a lot of hits in the sixti
 
 The first image, motown_plot1.png, shows the energy, acousticness and popularity of the tracks. The tracks have been divided into two classes, namely from_motown and not from_motown. This class describes wether a class is produced by Motown or not. It is interesting to see that the tracks both by and not by Motown are slightly clustered. This means that we cannot draw a conclusion to what made Motown so popular yet. Furthermore the image shows that acousticness and energy show a negative corelation. The less acoustic a track gets, the more energy a track contains
 
-![alt text](http://url/to/img.png)
+![motown_plot1](https://github.com/JJVmain/Musicology/blob/main/motown_plot1.png)
