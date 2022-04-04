@@ -1,0 +1,673 @@
+---
+title: "Motowns 1900s vs Motowns 2000s"
+output: 
+  flexdashboard::flex_dashboard:
+    vertical_layout: fill
+    orientation: columns
+    storyboard: true
+date: '2022-03-06'
+---
+
+```{r setup, include=FALSE}
+library(flexdashboard)
+library(ggplot2)
+library(tidyverse)
+library(spotifyr)
+library(compmus)
+library(plotly)
+library(ggdendro)
+library(heatmaply)
+library(tidymodels)
+library(ranger)
+
+knitr::include_url("https://open.spotify.com/embed/playlist/6lvlmqRVqND4iLCwqBOiev?utm_source=generator&theme=0")
+
+motown <- get_playlist_audio_features("", "6lvlmqRVqND4iLCwqBOiev")
+motown <- motown[order(motown$track.album.release_date),]
+#endless love and papa was a rolling stone didn't have the original release so the release year has to be adjusted
+motown[70, "track.album.release_date"] <- '1972'
+motown[128,"track.album.release_date"] <- '1981'
+
+#set the release date as a year so that grouping is easier
+motown$track.album.release_date <- as.POSIXct(motown$track.album.release_date, format = "%Y")
+motown$track.album.release_date <- format(motown$track.album.release_date, format="%Y")
+
+#transform year from chars to numeric
+motown <- transform(motown, track.album.release_date = as.numeric(track.album.release_date))
+
+motown_2000s <- motown %>% filter(track.album.release_date >= 2000)
+motown_1900s <- motown %>% filter(track.album.release_date < 2000)
+```
+
+Introduction
+=============================
+
+text {data- width = 750}
+-----------------------------
+
+Motown was a widely cherished label that has produced a lot of hits in the sixties and seventies. Even in the eighties Motown released a few hits like "Hello" by Lionel Richie or "I just called to say I love you" by Stevie Wonder. After Motown appointed new CEO Jheryl Busby in 1989, the label wasn't able to produce many more hits. The four hits from Motown in the nineties were by Boys II Men. In the nineties, Motown would be sold and resold to many different labels, such as "Polydor". Motown still had a rough time producing hits, but they kept releasing albums. A good example of a failed album released by Motown is "Dirty South" by Rasheeda. Even though the single "Do it" made it far, the debut album by Rasheeda was received poorly and she was let go by Motown. 
+
+During this project the difference between the hits Motown released in the 1900's and the albums that Motown released in the 2000's will be examined. To make a meaningful comparison, a corpus has been created which contains the hits that Motown released and a couple of the albums Motown released in the 2000's, such as "Dirty South" by Rasheeda and "The people vs." by Tick Tick. The corpus consists of 128 songs. This playlist will then be divided into the tracks that were released before the year 2000 and after the year 2000. The characteristics of the divided playlist will be compared to one another, after which similarities and differences will be discussed. 
+
+The most probable difference between Motown's 1900's and 2000's is the difference in genre. While Motown released a lot of 'westernized' soul and jazz tracks in the sixties through eighties, Motown switched to a more R&B approach by contracting boys to men in the nineties. These genres and their corresponding artists will therefore be examined during this project.
+
+playlist{data-width = 250}
+-----------------------------
+<iframe style="border-radius:12px" src="https://open.spotify.com/embed/playlist/6lvlmqRVqND4iLCwqBOiev?utm_source=generator&theme=0" width="100%" height="380" frameBorder="0" allowfullscreen="" allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture" data-external="1"></iframe>
+
+first visuals
+=============================
+
+comparison of popularity, speechiness and danceability regarding release date
+-----------------------------
+
+```{r motown}
+popularity_diff <- ggplot(motown, aes(x = track.album.release_date, y = track.popularity, color = speechiness, size = loudness, label = track.name)) + geom_point() + labs(title="comparison of popularity, speechiness and danceability regarding release date")
+
+ggplotly(popularity_diff)
+```
+
+comments
+-----------------------------
+
+This plot shows a track's release year, it's popularity, it's speechiness and it's loudness.The x-axis and the y-axis represent the release year and the popularity respectively, The size of a data point represents it's loudness and it's color represent it's speechiness
+It is clearly visible that, apart from a few tracks, Motown lost their popularity around the 2000s. We can also deduce from the plot that tracks after the 2000s often have a higher speechines, compared to the tracks before the 2000s. We may also deduce that tracks with a high loudness tend to perform worse than tracks that aren't as loud
+
+top songs analysis{.storyboard}
+=============================
+### Timbre
+
+The following graphs show the timbre of the most popular track from the 1900s, namely "My Girl" by The Tempations and "Didn't Cha Know" by Erykah Badu. The popularities of the tracks are 82 and 69 respectively. Both tracks show that the upper levels of timbre aren't reached by any means. There is a lot of magnitude in the lower levels however. My girl shows an increase of magnitude of c02 around 80 seconds untill the end of the track. Didn't Cha Know seems to have a lot of magnitude in c03 in the first 20 seconds, after which there is no real noticable change in timbre.
+
+#### My Girl
+```{r }
+my_girl_track <- get_tidy_audio_analysis("745H5CctFr12Mo7cqa1BMH")
+my_girl <-
+  my_girl_track %>% # Change URI.
+  compmus_align(bars, segments) %>%                     # Change `bars`
+  select(bars) %>%                                      #   in all three
+  unnest(bars) %>%                                      #   of these lines.
+  mutate(
+    pitches =
+      map(segments,
+        compmus_summarise, pitches,
+        method = "rms", norm = "euclidean"              # Change summary & norm.
+      )
+  ) %>%
+  mutate(
+    timbre =
+      map(segments,
+        compmus_summarise, timbre,
+        method = "rms", norm = "euclidean"              # Change summary & norm.
+      )
+  )
+
+my_girl %>%
+  compmus_gather_timbre() %>%
+  ggplot(
+    aes(
+      x = start + duration / 2,
+      width = duration,
+      y = basis,
+      fill = value
+    )
+  ) +
+  geom_tile() +
+  labs(title = 'Cepstrogram of My Girl by The Temptations', x = "Time (s)", y = NULL, fill = "Magnitude") +
+  scale_fill_viridis_c() +                              
+  theme_classic()
+```
+
+#### Didn't Cha Know
+
+```{r}
+didnt_cha_track <- get_tidy_audio_analysis("7pv80uUHfocFqfTytu1MVi")
+didnt_cha <-
+  didnt_cha_track %>% # Change URI.
+  compmus_align(bars, segments) %>%                     # Change `bars`
+  select(bars) %>%                                      #   in all three
+  unnest(bars) %>%                                      #   of these lines.
+  mutate(
+    pitches =
+      map(segments,
+        compmus_summarise, pitches,
+        method = "rms", norm = "euclidean"              # Change summary & norm.
+      )
+  ) %>%
+  mutate(
+    timbre =
+      map(segments,
+        compmus_summarise, timbre,
+        method = "rms", norm = "euclidean"              # Change summary & norm.
+      )
+  )
+
+didnt_cha %>%
+  compmus_gather_timbre() %>%
+  ggplot(
+    aes(
+      x = start + duration / 2,
+      width = duration,
+      y = basis,
+      fill = value
+    )
+  ) +
+  geom_tile() +
+  labs(title = "Cepstrogram of Didn't Cha Know by Erykah Badu", x = "Time (s)", y = NULL, fill = "Magnitude") +
+  scale_fill_viridis_c() +                              
+  theme_classic()
+
+```
+
+### Chroma
+
+These graphs represent the chroma during each track. While My girl uses more different chromas during the track, Didn't Cha Know seems to use the same chroma throughout the song, also showing a shift back and forth at t=55-75 and t=145-170. indicating the chorus of the track. 
+
+#### My Girl
+
+```{r}
+my_girl_chroma <-
+  my_girl_track %>%
+  select(segments) %>%
+  unnest(segments) %>%
+  select(start, duration, pitches)
+
+my_girl_chroma %>%
+  mutate(pitches = map(pitches, compmus_normalise, "euclidean")) %>%
+  compmus_gather_chroma() %>% 
+  ggplot(
+    aes(
+      x = start + duration / 2,
+      width = duration,
+      y = pitch_class,
+      fill = value
+    )
+  ) +
+  geom_tile() +
+  labs(title = 'Chromagram of My Girl by The Temptations', x = "Time (s)", y = NULL, fill = "Magnitude") +
+  theme_minimal() +
+  scale_fill_viridis_c()
+```
+
+#### Didn't Cha Know
+
+```{r}
+didnt_cha_chroma <-
+  didnt_cha_track %>%
+  select(segments) %>%
+  unnest(segments) %>%
+  select(start, duration, pitches)
+
+didnt_cha_chroma %>%
+  mutate(pitches = map(pitches, compmus_normalise, "euclidean")) %>%
+  compmus_gather_chroma() %>% 
+  ggplot(
+    aes(
+      x = start + duration / 2,
+      width = duration,
+      y = pitch_class,
+      fill = value
+    )
+  ) +
+  geom_tile() +
+  labs(title = "Chromagram of Didn't Cha Know by Erykah Badu", x = "Time (s)", y = NULL, fill = "Magnitude") +
+  theme_minimal() +
+  scale_fill_viridis_c()
+```
+
+
+### Self similarity
+
+In the following graphs, the self similarity of the song is represented. Didn't Cha Know contains a lot of similarity, which isn't an unexpected find, since the same lick and chords are used during the entire track. My Girl solely shows a slight dissimilarity at the start of the song, indicating the intro. The rest of the song shows very little dissimilarity, which again is not a strange find. My Girl is very structured into choruses and verses, which are very similar to each other
+
+#### My Girl
+
+```{r}
+my_girl_self_sim <-
+  my_girl_track %>% # Change URI.
+  compmus_align(bars, segments) %>%                     # Change `bars`
+  select(bars) %>%                                      #   in all three
+  unnest(bars) %>%                                      #   of these lines.
+  mutate(
+    pitches =
+      map(segments,
+        compmus_summarise, pitches,
+        method = "rms", norm = "euclidean"              # Change summary & norm.
+      )
+  ) %>%
+  mutate(
+    timbre =
+      map(segments,
+        compmus_summarise, timbre,
+        method = "rms", norm = "euclidean"              # Change summary & norm.
+      )
+  )
+
+my_girl_self_sim %>%
+  compmus_self_similarity(timbre, "cosine") %>% 
+  ggplot(
+    aes(
+      x = xstart + xduration / 2,
+      width = xduration,
+      y = ystart + yduration / 2,
+      height = yduration,
+      fill = d
+    )
+  ) +
+  geom_tile() +
+  coord_fixed() +
+  scale_fill_viridis_c(guide = "none") +
+  theme_classic() +
+  labs(x = "", y = "")
+```
+
+#### Didn't Cha Know
+
+```{r}
+didnt_cha_selfsim <-
+  didnt_cha_track %>% # Change URI.
+  compmus_align(bars, segments) %>%                     # Change `bars`
+  select(bars) %>%                                      #   in all three
+  unnest(bars) %>%                                      #   of these lines.
+  mutate(
+    pitches =
+      map(segments,
+        compmus_summarise, pitches,
+        method = "rms", norm = "euclidean"              # Change summary & norm.
+      )
+  ) %>%
+  mutate(
+    timbre =
+      map(segments,
+        compmus_summarise, timbre,
+        method = "rms", norm = "euclidean"              # Change summary & norm.
+      )
+  )
+
+didnt_cha_selfsim %>%
+  compmus_self_similarity(timbre, "cosine") %>% 
+  ggplot(
+    aes(
+      x = xstart + xduration / 2,
+      width = xduration,
+      y = ystart + yduration / 2,
+      height = yduration,
+      fill = d
+    )
+  ) +
+  geom_tile() +
+  coord_fixed() +
+  scale_fill_viridis_c(guide = "none") +
+  theme_classic() +
+  labs(x = "", y = "")
+```
+
+
+### Chord usage
+
+In the following graphs, the chord usages during the tracks are displayed. My Girl seems to use start of without any chords, after which it focusses on chords such as C major, F major and A minor. Seeming to transpose after 110 seconds. after this transpose the chords use are focussed around D major. Didn't Cha Know shows to simply be made around the B minor and D flat major chords. This is explainable by the chromagram of Didn't Cha Know, which showed to use the same chroma throughout the entire track.
+
+```{r}
+circshift <- function(v, n) {
+  if (n == 0) v else c(tail(v, n), head(v, -n))
+}
+
+#      C     C#    D     Eb    E     F     F#    G     Ab    A     Bb    B
+major_chord <-
+  c(   1,    0,    0,    0,    1,    0,    0,    1,    0,    0,    0,    0)
+minor_chord <-
+  c(   1,    0,    0,    1,    0,    0,    0,    1,    0,    0,    0,    0)
+seventh_chord <-
+  c(   1,    0,    0,    0,    1,    0,    0,    1,    0,    0,    1,    0)
+
+major_key <-
+  c(6.35, 2.23, 3.48, 2.33, 4.38, 4.09, 2.52, 5.19, 2.39, 3.66, 2.29, 2.88)
+minor_key <-
+  c(6.33, 2.68, 3.52, 5.38, 2.60, 3.53, 2.54, 4.75, 3.98, 2.69, 3.34, 3.17)
+
+chord_templates <-
+  tribble(
+    ~name, ~template,
+    "Gb:7", circshift(seventh_chord, 6),
+    "Gb:maj", circshift(major_chord, 6),
+    "Bb:min", circshift(minor_chord, 10),
+    "Db:maj", circshift(major_chord, 1),
+    "F:min", circshift(minor_chord, 5),
+    "Ab:7", circshift(seventh_chord, 8),
+    "Ab:maj", circshift(major_chord, 8),
+    "C:min", circshift(minor_chord, 0),
+    "Eb:7", circshift(seventh_chord, 3),
+    "Eb:maj", circshift(major_chord, 3),
+    "G:min", circshift(minor_chord, 7),
+    "Bb:7", circshift(seventh_chord, 10),
+    "Bb:maj", circshift(major_chord, 10),
+    "D:min", circshift(minor_chord, 2),
+    "F:7", circshift(seventh_chord, 5),
+    "F:maj", circshift(major_chord, 5),
+    "A:min", circshift(minor_chord, 9),
+    "C:7", circshift(seventh_chord, 0),
+    "C:maj", circshift(major_chord, 0),
+    "E:min", circshift(minor_chord, 4),
+    "G:7", circshift(seventh_chord, 7),
+    "G:maj", circshift(major_chord, 7),
+    "B:min", circshift(minor_chord, 11),
+    "D:7", circshift(seventh_chord, 2),
+    "D:maj", circshift(major_chord, 2),
+    "F#:min", circshift(minor_chord, 6),
+    "A:7", circshift(seventh_chord, 9),
+    "A:maj", circshift(major_chord, 9),
+    "C#:min", circshift(minor_chord, 1),
+    "E:7", circshift(seventh_chord, 4),
+    "E:maj", circshift(major_chord, 4),
+    "G#:min", circshift(minor_chord, 8),
+    "B:7", circshift(seventh_chord, 11),
+    "B:maj", circshift(major_chord, 11),
+    "D#:min", circshift(minor_chord, 3)
+  )
+
+key_templates <-
+  tribble(
+    ~name, ~template,
+    "Gb:maj", circshift(major_key, 6),
+    "Bb:min", circshift(minor_key, 10),
+    "Db:maj", circshift(major_key, 1),
+    "F:min", circshift(minor_key, 5),
+    "Ab:maj", circshift(major_key, 8),
+    "C:min", circshift(minor_key, 0),
+    "Eb:maj", circshift(major_key, 3),
+    "G:min", circshift(minor_key, 7),
+    "Bb:maj", circshift(major_key, 10),
+    "D:min", circshift(minor_key, 2),
+    "F:maj", circshift(major_key, 5),
+    "A:min", circshift(minor_key, 9),
+    "C:maj", circshift(major_key, 0),
+    "E:min", circshift(minor_key, 4),
+    "G:maj", circshift(major_key, 7),
+    "B:min", circshift(minor_key, 11),
+    "D:maj", circshift(major_key, 2),
+    "F#:min", circshift(minor_key, 6),
+    "A:maj", circshift(major_key, 9),
+    "C#:min", circshift(minor_key, 1),
+    "E:maj", circshift(major_key, 4),
+    "G#:min", circshift(minor_key, 8),
+    "B:maj", circshift(major_key, 11),
+    "D#:min", circshift(minor_key, 3)
+  )
+```
+
+
+#### My Girl
+
+```{r}
+my_girl_chords <-
+  my_girl_track %>%
+  compmus_align(sections, segments) %>%
+  select(sections) %>%
+  unnest(sections) %>%
+  mutate(
+    pitches =
+      map(segments,
+        compmus_summarise, pitches,
+        method = "mean", norm = "manhattan"
+      )
+  )
+
+my_girl_chords %>% 
+  compmus_match_pitch_template(
+    key_templates,         # Change to chord_templates if descired
+    method = "euclidean",  # Try different distance metrics
+    norm = "manhattan"     # Try different norms
+  ) %>%
+  ggplot(
+    aes(x = start + duration / 2, width = duration, y = name, fill = d)
+  ) +
+  geom_tile() +
+  scale_fill_viridis_c(guide = "none") +
+  theme_minimal() +
+  labs(x = "Time (s)", y = "")
+```
+
+#### Didn't Cha Know
+
+```{r}
+didnt_cha_chords <-
+  didnt_cha_track %>%
+  compmus_align(sections, segments) %>%
+  select(sections) %>%
+  unnest(sections) %>%
+  mutate(
+    pitches =
+      map(segments,
+        compmus_summarise, pitches,
+        method = "mean", norm = "manhattan"
+      )
+  )
+
+didnt_cha_chords %>% 
+  compmus_match_pitch_template(
+    key_templates,         # Change to chord_templates if descired
+    method = "euclidean",  # Try different distance metrics
+    norm = "manhattan"     # Try different norms
+  ) %>%
+  ggplot(
+    aes(x = start + duration / 2, width = duration, y = name, fill = d)
+  ) +
+  geom_tile() +
+  scale_fill_viridis_c(guide = "none") +
+  theme_minimal() +
+  labs(x = "Time (s)", y = "")
+```
+
+
+### Tempo comparison
+
+These graphs show the tempo of the tracks given the time. While the tempo of Didn't Cha Know is quite  and steady, namely around 135 beats per minute, My Girl shows a slight increase in tempo from around 100 bpm to 110 bpm at the end of the track. Indicating that it has most likely been performed live with every musician on the track recording at the same time instead of recording seperately.
+
+#### My girl
+
+```{r}
+my_girl_track %>%
+  tempogram(window_size = 8, hop_size = 1, cyclic = TRUE) %>%
+  ggplot(aes(x = time, y = bpm, fill = power)) +
+  geom_raster() +
+  scale_fill_viridis_c(guide = "none") +
+  labs(x = "Time (s)", y = "Tempo (BPM)") +
+  theme_classic()
+```
+
+#### Didn't Cha Know
+
+```{r}
+didnt_cha_track %>%
+  tempogram(window_size = 8, hop_size = 1, cyclic = TRUE) %>%
+  ggplot(aes(x = time, y = bpm, fill = power)) +
+  geom_raster() +
+  scale_fill_viridis_c(guide = "none") +
+  labs(x = "Time (s)", y = "Tempo (BPM)") +
+  theme_classic()
+```
+
+
+Playlist comparison{.storyboard}
+=============================
+
+### tempo comparison
+
+```{r comparison}
+motown_1900s <-
+  motown_1900s%>%
+  add_audio_analysis()
+  
+motown_2000s <-
+  motown_2000s %>%
+  add_audio_analysis()
+  
+motown_full <-
+  motown_1900s %>%
+  mutate(year = "1900s") %>%
+  bind_rows(motown_2000s %>% mutate(year = "2000s"))
+  
+motown_full %>%
+  mutate(
+    sections =
+      map(
+        sections,                                    # sections or segments
+        summarise_at,
+        vars(tempo, loudness, duration),             # features of interest
+        list(section_mean = mean, section_sd = sd)   # aggregation functions
+      )
+  ) %>%
+  unnest(sections) %>%
+  ggplot(
+    aes(
+      x = tempo,
+      y = tempo_section_sd,
+      colour = year,
+      alpha = loudness
+    )
+  ) +
+  geom_point(aes(size = duration / 60)) +
+  geom_rug() +
+  theme_minimal() +
+  ylim(0, 5) +
+  labs(
+    x = "Mean Tempo (bpm)",
+    y = "SD Tempo",
+    colour = "Released before or after 2000",
+    size = "Duration (min)",
+    alpha = "Volume (dBFS)"
+  )
+```
+
+***
+
+The plot on the left show the mean tempo of the tracks Motown released against the variation of tempo in these tracks. The size of the data represents the duration of the tracks. Their volume and whether the tracks were release after or before the year 2000 are represented by their transparency and their color respectively. While the tracks released before the year 2000 are mostly settled around a mean tempo of 110 bpm, the tracks released after the year 2000 show to be either slower, containing a tempo of around 80 through 100 bpm, or faster, containing a tempo of around 130. Again showing that Motown has made a change in the type of music they release.
+
+
+### Timbre comparison
+```{r timbre comparison}  
+  motown_full %>%
+  mutate(
+    timbre =
+      map(
+        segments,
+        compmus_summarise,
+        timbre,
+        method = "mean"
+      )
+  ) %>%
+  select(year, timbre) %>%
+  compmus_gather_timbre() %>%
+  ggplot(aes(x = basis, y = value, fill = year)) +
+  geom_violin() +
+  scale_fill_viridis_d() +
+  labs(x = "Spotify Timbre Coefficients", y = "", fill = "Released before or after 2000")
+```
+
+***
+
+This plot shows the timbre coefficients of all tracks Motown released. distinguishing tracks between whether they are released before or after 2000.
+The difference of timbre coefficients in tracks Motown has released either before or after the year 2000 shows that motown has made a big change in their music after the year 2000. The coefficients seem to show the most similarity in c06, c07, c09 and c10. Any other coefficient shows a big difference.
+
+Classification
+=============================
+
+plot{data-width=750}
+-----------------------------
+```{r}
+get_conf_mat <- function(fit) {
+  outcome <- .get_tune_outcome_names(fit)
+  fit %>% 
+    collect_predictions() %>% 
+    conf_mat(truth = outcome, estimate = .pred_class)
+}  
+
+get_pr <- function(fit) {
+  fit %>% 
+    conf_mat_resampled() %>% 
+    group_by(Prediction) %>% mutate(precision = Freq / sum(Freq)) %>% 
+    group_by(Truth) %>% mutate(recall = Freq / sum(Freq)) %>% 
+    ungroup() %>% filter(Prediction == Truth) %>% 
+    select(class = Prediction, precision, recall)
+}  
+
+motown_features <-
+  motown_full %>%
+  mutate(
+    year = factor(year),
+    segments = map2(segments, key, compmus_c_transpose),
+    pitches =
+      map(
+        segments,
+        compmus_summarise, pitches,
+        method = "mean", norm = "manhattan"
+      ),
+    timbre =
+      map(
+        segments,
+        compmus_summarise, timbre,
+        method = "mean",
+      )
+  ) %>%
+  mutate(pitches = map(pitches, compmus_normalise, "clr")) %>%
+  mutate_at(vars(pitches, timbre), map, bind_rows) %>%
+  unnest(cols = c(pitches, timbre))
+
+motown_recipe <-
+  recipe(
+    year ~
+      danceability +
+      energy +
+      loudness +
+      speechiness +
+      acousticness +
+      instrumentalness +
+      liveness +
+      valence +
+      tempo +
+      duration +
+      C + `C#|Db` + D + `D#|Eb` +
+      E + `F` + `F#|Gb` + G +
+      `G#|Ab` + A + `A#|Bb` + B +
+      c01 + c02 + c03 + c04 + c05 + c06 +
+      c07 + c08 + c09 + c10 + c11 + c12,
+    data = motown_features,          # Use the same name as the previous block.
+  ) %>%
+  step_center(all_predictors()) %>%
+  step_scale(all_predictors())      # Converts to z-scores.
+  # step_range(all_predictors())    # Sets range to [0, 1].
+
+motown_cv <- motown_features %>% vfold_cv(5)
+
+forest_model <-
+  rand_forest() %>%
+  set_mode("classification") %>% 
+  set_engine("ranger", importance = "impurity")
+
+motown_forest <- 
+  workflow() %>% 
+  add_recipe(motown_recipe) %>% 
+  add_model(forest_model) %>% 
+  fit_resamples(
+    motown_cv, 
+    control = control_resamples(save_pred = TRUE)
+  )
+
+motown_forest %>%
+  get_conf_mat() %>% 
+  autoplot(type="heatmap") + labs(title="Confusion Matrix")
+```
+
+Comments{data-width = 250}
+------------------------------
+
+A random forrest classifier has been used to examine whether an algorithm is able to distinguish the tracks motown released before 2000 from the tracks motown released after 2000. The algorithm shows to have done well. It has classified 111 out of 128 tracks correctly. This once again shows that the tracks that Motown released after 2000 are quite different than the tracks that were released before that time
+
+
+Discussion and conclusion
+=============================
+
+During this project it has become clear that Motown had made quite a few changes in the type of music that they released. The speechiness has increased as well as the loudness that is produced in these tracks. A closer look into the most popular track from each era has shown that, even though a clear verse-chorus structure is still being used, the use of musical range has decreased greatly. From using multiple instruments to very little instruments. Either a big increase or decrease in tempo and very little use of the musical chroma later in time.
+
+Motown has had a hard time after the transit of CEO, which of course is a big part in the decreasing popularity of Motown, but a clear change in genre has not shown to solve any problems as Motown has been divided and sold to multiple owners multiple times.
+
